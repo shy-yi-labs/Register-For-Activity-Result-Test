@@ -201,8 +201,10 @@ class ConditionalMultiplePermissionRequestContract(
         }
 
         return if (requestPredicate(permissionStateMap)) {
+            null
+        } else {
             SynchronousResult(true)
-        } else null
+        }
     }
 }
 
