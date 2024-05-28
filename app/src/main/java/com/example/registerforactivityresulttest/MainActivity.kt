@@ -19,35 +19,57 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
-class HomeFragment : Fragment() {
-    private val launcher = registerForActivityResultWithRationale(
-        rationaleMessage = "권한이 필요해요.",
-        onNegativeButtonClick = {
-            Toast.makeText(requireContext(), "권한 거부", Toast.LENGTH_SHORT).show()
-        },
-        contract = ConditionalMultiplePermissionRequestContract(
-            resultPredicate = { permissionStateMap -> permissionStateMap.values.all { it } },
-            requestPredicate = { permissionStateMap -> permissionStateMap.values.all { it }.not() }
-        )
-    ) {
 
-    }
+/*
+요구사항
+- 다이얼로그 띄우기
+- 요청 조건 체크
+- 결과 Pass/Fail 판정
+- 사전 Permission 목록 정의
+- launch 시점 result callback 적용
+*/
+
+class HomeFragment : Fragment() {
+    private val launcher = DeferredActivityResultLauncher(
+        activityResultLauncherProvider = { callback ->
+            registerForActivityResultWithRationale(
+                rationaleMessage = "권한이 필요해요.",
+                onNegativeButtonClick = {
+                    callback.onActivityResult(false)
+                },
+                contract = ConditionalMultiplePermissionRequestContract(
+                    resultPredicate = { permissionStateMap -> permissionStateMap.values.all { it } },
+                    requestPredicate = { permissionStateMap ->
+                        permissionStateMap.values.all { it }.not()
+                    }
+                ),
+                callback
+            )
+        },
+        input = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+    )
 }
 
 class MainActivity : AppCompatActivity() {
 
-    private val launcher = registerForActivityResultWithRationale(
-        rationaleMessage = "권한이 필요해요.",
-        onNegativeButtonClick = {
-            Toast.makeText(this, "권한 거부", Toast.LENGTH_SHORT).show()
+    private val launcher = DeferredActivityResultLauncher(
+        activityResultLauncherProvider = { callback ->
+            registerForActivityResultWithRationale(
+                rationaleMessage = "권한이 필요해요.",
+                onNegativeButtonClick = {
+                    callback.onActivityResult(false)
+                },
+                contract = ConditionalMultiplePermissionRequestContract(
+                    resultPredicate = { permissionStateMap -> permissionStateMap.values.all { it } },
+                    requestPredicate = { permissionStateMap ->
+                        permissionStateMap.values.all { it }.not()
+                    }
+                ),
+                callback
+            )
         },
-        contract = ConditionalMultiplePermissionRequestContract(
-            resultPredicate = { permissionStateMap -> permissionStateMap.values.all { it } },
-            requestPredicate = { permissionStateMap -> permissionStateMap.values.all { it }.not() }
-        )
-    ) {
-
-    }
+        input = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,9 +81,13 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        launcher.launch(
-            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-        )
+        launcher.launch {
+            if (it) {
+                Toast.makeText(this, "권한 허용", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "권한 거부", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 }
 
@@ -153,9 +179,11 @@ class RationaleActivityResultLauncher(
 class ConditionalMultiplePermissionRequestContract(
     private val resultPredicate: (Map<String, Boolean>) -> Boolean,
     private val requestPredicate: (Map<String, Boolean>) -> Boolean = resultPredicate
-): ActivityResultContract<Array<String>, Boolean>() {
+) : ActivityResultContract<Array<String>, Boolean>() {
 
-    private val multiplePermissionRequestContract = ActivityResultContracts.RequestMultiplePermissions()
+    private val multiplePermissionRequestContract =
+        ActivityResultContracts.RequestMultiplePermissions()
+
     override fun createIntent(context: Context, input: Array<String>): Intent {
         return multiplePermissionRequestContract.createIntent(context, input)
     }
@@ -175,5 +203,28 @@ class ConditionalMultiplePermissionRequestContract(
         return if (requestPredicate(permissionStateMap)) {
             SynchronousResult(true)
         } else null
+    }
+}
+
+class DeferredActivityResultLauncher<I, O>(
+    private val input: I,
+    activityResultLauncherProvider: (ActivityResultCallback<O>) -> ActivityResultLauncher<I>,
+) {
+    private var mCallback: ((O) -> Unit)? = null
+
+    private val launcher = activityResultLauncherProvider {
+        mCallback?.invoke(it)
+    }
+
+    val contract: ActivityResultContract<I, *>
+        get() = launcher.contract
+
+    fun unregister() {
+        launcher.unregister()
+    }
+
+    fun launch(options: ActivityOptionsCompat? = null, callback: (O) -> Unit) {
+        mCallback = callback
+        launcher.launch(input, options)
     }
 }
