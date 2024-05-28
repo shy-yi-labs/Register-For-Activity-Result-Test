@@ -34,6 +34,7 @@ class HomeFragment : Fragment() {
         activityResultLauncherProvider = { callback ->
             registerForActivityResultWithRationale(
                 rationaleMessage = "권한이 필요해요.",
+                shouldShowRequestPermissionRationale = { _ ->  true},
                 onNegativeButtonClick = {
                     callback.onActivityResult(false)
                 },
@@ -43,7 +44,7 @@ class HomeFragment : Fragment() {
                         permissionStateMap.values.all { it }.not()
                     }
                 ),
-                callback
+                callback = callback
             )
         },
         input = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -56,6 +57,7 @@ class MainActivity : AppCompatActivity() {
         activityResultLauncherProvider = { callback ->
             registerForActivityResultWithRationale(
                 rationaleMessage = "권한이 필요해요.",
+                shouldShowRequestPermissionRationale = { _ ->  true},
                 onNegativeButtonClick = {
                     callback.onActivityResult(false)
                 },
@@ -65,7 +67,7 @@ class MainActivity : AppCompatActivity() {
                         permissionStateMap.values.all { it }.not()
                     }
                 ),
-                callback
+                callback = callback
             )
         },
         input = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -93,13 +95,14 @@ class MainActivity : AppCompatActivity() {
 
 fun <O> ComponentActivity.registerForActivityResultWithRationale(
     rationaleMessage: String,
+    shouldShowRequestPermissionRationale: (String) -> Boolean = this::shouldShowRequestPermissionRationale,
     onNegativeButtonClick: () -> Unit,
     contract: ActivityResultContract<Array<String>, O>,
     callback: ActivityResultCallback<O>
 ): ActivityResultLauncher<Array<String>> {
     return registerForActivityResultWithRationale(
         context = this,
-        shouldShowRequestPermissionRationale = this::shouldShowRequestPermissionRationale,
+        shouldShowRequestPermissionRationale = shouldShowRequestPermissionRationale,
         rationaleMessage = rationaleMessage,
         onNegativeButtonClick = onNegativeButtonClick,
         contract = contract,
@@ -110,13 +113,14 @@ fun <O> ComponentActivity.registerForActivityResultWithRationale(
 
 fun <O> Fragment.registerForActivityResultWithRationale(
     rationaleMessage: String,
+    shouldShowRequestPermissionRationale: (String) -> Boolean = this::shouldShowRequestPermissionRationale,
     onNegativeButtonClick: () -> Unit,
     contract: ActivityResultContract<Array<String>, O>,
     callback: ActivityResultCallback<O>
 ): ActivityResultLauncher<Array<String>> {
     return registerForActivityResultWithRationale(
         context = requireContext(),
-        shouldShowRequestPermissionRationale = this::shouldShowRequestPermissionRationale,
+        shouldShowRequestPermissionRationale = shouldShowRequestPermissionRationale,
         rationaleMessage = rationaleMessage,
         onNegativeButtonClick = onNegativeButtonClick,
         contract = contract,
