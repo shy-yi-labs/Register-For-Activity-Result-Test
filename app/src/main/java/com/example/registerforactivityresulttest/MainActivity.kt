@@ -30,48 +30,12 @@ import androidx.fragment.app.Fragment
 */
 
 class HomeFragment : Fragment() {
-    private val launcher = DeferredActivityResultLauncher(
-        activityResultLauncherProvider = { callback ->
-            registerForActivityResultWithRationale(
-                rationaleMessage = "권한이 필요해요.",
-                shouldShowRequestPermissionRationale = { _ ->  true},
-                onNegativeButtonClick = {
-                    callback.onActivityResult(false)
-                },
-                contract = ConditionalMultiplePermissionRequestContract(
-                    resultPredicate = { permissionStateMap -> permissionStateMap.values.all { it } },
-                    requestPredicate = { permissionStateMap ->
-                        permissionStateMap.values.all { it }.not()
-                    }
-                ),
-                callback = callback
-            )
-        },
-        input = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-    )
+    private val launcher = registerReadExternalMediaPermissionRequest()
 }
 
 class MainActivity : AppCompatActivity() {
 
-    private val launcher = DeferredActivityResultLauncher(
-        activityResultLauncherProvider = { callback ->
-            registerForActivityResultWithRationale(
-                rationaleMessage = "권한이 필요해요.",
-                shouldShowRequestPermissionRationale = { _ ->  true},
-                onNegativeButtonClick = {
-                    callback.onActivityResult(false)
-                },
-                contract = ConditionalMultiplePermissionRequestContract(
-                    resultPredicate = { permissionStateMap -> permissionStateMap.values.all { it } },
-                    requestPredicate = { permissionStateMap ->
-                        permissionStateMap.values.all { it }.not()
-                    }
-                ),
-                callback = callback
-            )
-        },
-        input = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-    )
+    private val launcher = registerReadExternalMediaPermissionRequest()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -93,6 +57,47 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
+fun ComponentActivity.registerReadExternalMediaPermissionRequest(): DeferredActivityResultLauncher<Array<String>, Boolean> {
+    return registerReadExternalMediaPermissionRequest(
+        context = this,
+        registerForActivityResult = this::registerForActivityResult
+    )
+}
+
+fun Fragment.registerReadExternalMediaPermissionRequest(): DeferredActivityResultLauncher<Array<String>, Boolean> {
+    return registerReadExternalMediaPermissionRequest(
+        context = requireContext(),
+        registerForActivityResult = this::registerForActivityResult
+    )
+}
+
+fun registerReadExternalMediaPermissionRequest(
+    context: Context,
+    registerForActivityResult: (ActivityResultContract<Array<String>, Boolean>, ActivityResultCallback<Boolean>) -> ActivityResultLauncher<Array<String>>
+): DeferredActivityResultLauncher<Array<String>, Boolean> {
+    return DeferredActivityResultLauncher(
+        activityResultLauncherProvider = { callback ->
+            registerForActivityResultWithRationale(
+                context = context,
+                registerForActivityResult = registerForActivityResult,
+                rationaleMessage = "권한이 필요해요.",
+                shouldShowRequestPermissionRationale = { _ ->  true},
+                onNegativeButtonClick = {
+                    callback.onActivityResult(false)
+                },
+                contract = ConditionalMultiplePermissionRequestContract(
+                    resultPredicate = { permissionStateMap -> permissionStateMap.values.all { it } },
+                    requestPredicate = { permissionStateMap ->
+                        permissionStateMap.values.all { it }.not()
+                    }
+                ),
+                callback = callback
+            )
+        },
+        input = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+    )
+}
+
 fun <O> ComponentActivity.registerForActivityResultWithRationale(
     rationaleMessage: String,
     shouldShowRequestPermissionRationale: (String) -> Boolean = this::shouldShowRequestPermissionRationale,
@@ -102,12 +107,12 @@ fun <O> ComponentActivity.registerForActivityResultWithRationale(
 ): ActivityResultLauncher<Array<String>> {
     return registerForActivityResultWithRationale(
         context = this,
+        registerForActivityResult = this::registerForActivityResult,
         shouldShowRequestPermissionRationale = shouldShowRequestPermissionRationale,
         rationaleMessage = rationaleMessage,
         onNegativeButtonClick = onNegativeButtonClick,
         contract = contract,
-        callback = callback,
-        registerActivityForResult = this::registerForActivityResult
+        callback = callback
     )
 }
 
@@ -120,30 +125,30 @@ fun <O> Fragment.registerForActivityResultWithRationale(
 ): ActivityResultLauncher<Array<String>> {
     return registerForActivityResultWithRationale(
         context = requireContext(),
+        registerForActivityResult = this::registerForActivityResult,
         shouldShowRequestPermissionRationale = shouldShowRequestPermissionRationale,
         rationaleMessage = rationaleMessage,
         onNegativeButtonClick = onNegativeButtonClick,
         contract = contract,
-        callback = callback,
-        registerActivityForResult = this::registerForActivityResult
+        callback = callback
     )
 }
 
 fun <O> registerForActivityResultWithRationale(
     context: Context,
+    registerForActivityResult: (ActivityResultContract<Array<String>, O>, ActivityResultCallback<O>) -> ActivityResultLauncher<Array<String>>,
     shouldShowRequestPermissionRationale: (String) -> Boolean,
     rationaleMessage: String,
     onNegativeButtonClick: () -> Unit,
     contract: ActivityResultContract<Array<String>, O>,
-    callback: ActivityResultCallback<O>,
-    registerActivityForResult: (ActivityResultContract<Array<String>, O>, ActivityResultCallback<O>) -> ActivityResultLauncher<Array<String>>
+    callback: ActivityResultCallback<O>
 ): ActivityResultLauncher<Array<String>> {
     return RationaleActivityResultLauncher(
         context = context,
         shouldShowRequestPermissionRationale = shouldShowRequestPermissionRationale,
         rationaleMessage = rationaleMessage,
         onNegativeButtonClick = onNegativeButtonClick,
-        launcher = registerActivityForResult(contract, callback)
+        launcher = registerForActivityResult(contract, callback)
     )
 }
 
