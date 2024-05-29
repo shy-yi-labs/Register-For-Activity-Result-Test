@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.widget.Button
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
@@ -47,24 +48,28 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        launcher.launch {
-            if (it) {
-                Toast.makeText(this, "권한 허용", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "권한 거부", Toast.LENGTH_SHORT).show()
+        val button = findViewById<Button>(R.id.btClickMe)
+
+        button.setOnClickListener {
+            launcher.launch {
+                if (it) {
+                    Toast.makeText(this, "권한 허용", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "권한 거부", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
 }
 
-fun ComponentActivity.registerReadExternalMediaPermissionRequest(): DeferredActivityResultLauncher<Array<String>, Boolean> {
+fun ComponentActivity.registerReadExternalMediaPermissionRequest(): PredefinedActivityResultLauncher<Array<String>, Boolean> {
     return registerReadExternalMediaPermissionRequest(
         context = this,
         registerForActivityResult = this::registerForActivityResult
     )
 }
 
-fun Fragment.registerReadExternalMediaPermissionRequest(): DeferredActivityResultLauncher<Array<String>, Boolean> {
+fun Fragment.registerReadExternalMediaPermissionRequest(): PredefinedActivityResultLauncher<Array<String>, Boolean> {
     return registerReadExternalMediaPermissionRequest(
         context = requireContext(),
         registerForActivityResult = this::registerForActivityResult
@@ -74,8 +79,8 @@ fun Fragment.registerReadExternalMediaPermissionRequest(): DeferredActivityResul
 fun registerReadExternalMediaPermissionRequest(
     context: Context,
     registerForActivityResult: (ActivityResultContract<Array<String>, Boolean>, ActivityResultCallback<Boolean>) -> ActivityResultLauncher<Array<String>>
-): DeferredActivityResultLauncher<Array<String>, Boolean> {
-    return DeferredActivityResultLauncher(
+): PredefinedActivityResultLauncher<Array<String>, Boolean> {
+    return PredefinedActivityResultLauncher(
         activityResultLauncherProvider = { callback ->
             registerForActivityResultWithRationale(
                 context = context,
@@ -217,7 +222,7 @@ class ConditionalMultiplePermissionRequestContract(
     }
 }
 
-class DeferredActivityResultLauncher<I, O>(
+class PredefinedActivityResultLauncher<I, O>(
     private val input: I,
     activityResultLauncherProvider: (ActivityResultCallback<O>) -> ActivityResultLauncher<I>,
 ) {
@@ -225,6 +230,7 @@ class DeferredActivityResultLauncher<I, O>(
 
     private val launcher = activityResultLauncherProvider {
         mCallback?.invoke(it)
+        mCallback = null
     }
 
     val contract: ActivityResultContract<I, *>
@@ -234,8 +240,13 @@ class DeferredActivityResultLauncher<I, O>(
         launcher.unregister()
     }
 
+    @Synchronized
     fun launch(options: ActivityOptionsCompat? = null, callback: (O) -> Unit) {
-        mCallback = callback
+        if (mCallback == null) {
+            mCallback = callback
+        } else {
+            throw IllegalStateException("Already waiting for a result")
+        }
         launcher.launch(input, options)
     }
 }
