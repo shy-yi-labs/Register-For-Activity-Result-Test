@@ -4,7 +4,9 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import android.widget.Button
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -65,21 +67,26 @@ class MainActivity : AppCompatActivity() {
 fun ComponentActivity.registerReadExternalMediaPermissionRequest(): PredefinedActivityResultLauncher<Array<String>, Boolean> {
     return registerReadExternalMediaPermissionRequest(
         context = this,
-        registerForActivityResult = this::registerForActivityResult
+        registerForActivityResult = this::registerForActivityResult,
+        shouldShowRequestPermissionRationale = this::shouldShowRequestPermissionRationale
     )
 }
 
 fun Fragment.registerReadExternalMediaPermissionRequest(): PredefinedActivityResultLauncher<Array<String>, Boolean> {
     return registerReadExternalMediaPermissionRequest(
         context = requireContext(),
-        registerForActivityResult = this::registerForActivityResult
+        registerForActivityResult = this::registerForActivityResult,
+        shouldShowRequestPermissionRationale = this::shouldShowRequestPermissionRationale
     )
 }
 
 fun registerReadExternalMediaPermissionRequest(
     context: Context,
-    registerForActivityResult: (ActivityResultContract<Array<String>, Boolean>, ActivityResultCallback<Boolean>) -> ActivityResultLauncher<Array<String>>
+    registerForActivityResult: (ActivityResultContract<Array<String>, Boolean>, ActivityResultCallback<Boolean>) -> ActivityResultLauncher<Array<String>>,
+    shouldShowRequestPermissionRationale: (String) -> Boolean
 ): PredefinedActivityResultLauncher<Array<String>, Boolean> {
+    val permissions = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+
     return PredefinedActivityResultLauncher(
         activityResultLauncherProvider = { callback ->
             registerForActivityResultWithRationale(
@@ -96,12 +103,56 @@ fun registerReadExternalMediaPermissionRequest(
                         permissionStateMap.values.all { it }.not()
                     }
                 ),
-                callback = callback
+                callback = PermissionPermanentlyDeniedActivityLauncherCallback(
+                    context = context,
+                    callback = callback,
+                    permissions = permissions,
+                    shouldShowRequestPermissionRationale = shouldShowRequestPermissionRationale
+                )
             )
         },
-        input = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        input = permissions
     )
 }
+
+class PermissionPermanentlyDeniedActivityLauncherCallback<O>(
+    val context: Context,
+    val callback: ActivityResultCallback<O>,
+    val permissions: Array<String>,
+    val shouldShowRequestPermissionRationale: (String) -> Boolean
+): ActivityResultCallback<O> {
+    override fun onActivityResult(result: O) {
+        val permanentlyDeniedPermissions = permissions.filter {
+            context.checkSelfPermission(it) == PackageManager.PERMISSION_DENIED &&
+                    shouldShowRequestPermissionRationale(it)
+        }
+
+        val message = StringBuilder().apply {
+            append("해당 기능을 사용할 수 없습니다.\n권한을 허용하시려면 설정을 눌러주세요.\n\n필요 권한:")
+            permanentlyDeniedPermissions.forEach {
+                append("\n- $it")
+            }
+        }
+
+        if (permanentlyDeniedPermissions.isNotEmpty()) {
+            AlertDialog.Builder(context)
+                .setMessage(message)
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    context.startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.fromParts("package", context.packageName, null)
+                        }
+                    )
+                }
+                .setNegativeButton(android.R.string.cancel) { _, _ -> }
+                .show()
+            return
+        }
+
+        callback.onActivityResult(result)
+    }
+}
+
 
 fun <O> ComponentActivity.registerForActivityResultWithRationale(
     rationaleMessage: String,
