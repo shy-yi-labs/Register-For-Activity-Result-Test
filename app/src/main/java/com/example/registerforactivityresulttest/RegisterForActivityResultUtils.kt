@@ -38,8 +38,6 @@ fun registerReadExternalMediaPermissionRequest(
     registerForActivityResult: (ActivityResultContract<Array<String>, PermissionResultMap>, ActivityResultCallback<PermissionResultMap>) -> ActivityResultLauncher<Array<String>>,
     shouldShowRequestPermissionRationale: (String) -> Boolean
 ): PredefinedActivityResultLauncher<Array<String>, PermissionResultMap> {
-    val permissions = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-
     return PredefinedActivityResultLauncher(
         activityResultLauncherProvider = { callback ->
             registerForActivityResultWithRationale(
@@ -51,7 +49,7 @@ fun registerReadExternalMediaPermissionRequest(
                     callback.onActivityResult(
                         PermissionResultMap(
                             isGranted = false,
-                            permissionStateMap = permissions.associateWith { false },
+                            permissionStateMap = it.associateWith { false },
                         )
                     )
                 },
@@ -68,7 +66,7 @@ fun registerReadExternalMediaPermissionRequest(
                 )
             )
         },
-        input = permissions
+        input = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
     )
 }
 
@@ -113,7 +111,7 @@ class PermissionPermanentlyDeniedActivityLauncherCallback<O: Map<String, Boolean
 fun <O> ComponentActivity.registerForActivityResultWithRationale(
     rationaleMessage: String,
     shouldShowRequestPermissionRationale: (String) -> Boolean = this::shouldShowRequestPermissionRationale,
-    onNegativeButtonClick: () -> Unit,
+    onNegativeButtonClick: (Array<String>) -> Unit,
     contract: ActivityResultContract<Array<String>, O>,
     callback: ActivityResultCallback<O>
 ): ActivityResultLauncher<Array<String>> {
@@ -131,7 +129,7 @@ fun <O> ComponentActivity.registerForActivityResultWithRationale(
 fun <O> Fragment.registerForActivityResultWithRationale(
     rationaleMessage: String,
     shouldShowRequestPermissionRationale: (String) -> Boolean = this::shouldShowRequestPermissionRationale,
-    onNegativeButtonClick: () -> Unit,
+    onNegativeButtonClick: (Array<String>) -> Unit,
     contract: ActivityResultContract<Array<String>, O>,
     callback: ActivityResultCallback<O>
 ): ActivityResultLauncher<Array<String>> {
@@ -151,7 +149,7 @@ fun <O> registerForActivityResultWithRationale(
     registerForActivityResult: (ActivityResultContract<Array<String>, O>, ActivityResultCallback<O>) -> ActivityResultLauncher<Array<String>>,
     shouldShowRequestPermissionRationale: (String) -> Boolean,
     rationaleMessage: String,
-    onNegativeButtonClick: () -> Unit,
+    onNegativeButtonClick: (Array<String>) -> Unit,
     contract: ActivityResultContract<Array<String>, O>,
     callback: ActivityResultCallback<O>
 ): ActivityResultLauncher<Array<String>> {
@@ -169,7 +167,7 @@ class RationaleActivityResultLauncher(
     private val launcher: ActivityResultLauncher<Array<String>>,
     private val rationaleMessage: String,
     private val shouldShowRequestPermissionRationale: (String) -> Boolean,
-    private val onNegativeButtonClick: () -> Unit
+    private val onNegativeButtonClick: (Array<String>) -> Unit
 ) : ActivityResultLauncher<Array<String>>() {
     override val contract: ActivityResultContract<Array<String>, *>
         get() = launcher.contract
@@ -189,7 +187,7 @@ class RationaleActivityResultLauncher(
                     launcher.launch(input, options)
                 }
                 .setNegativeButton(android.R.string.cancel) { _, _ ->
-                    onNegativeButtonClick()
+                    onNegativeButtonClick(input)
                 }
                 .show()
         } else {
