@@ -46,7 +46,7 @@ fun registerReadExternalMediaPermissionRequest(
                 contextProvider = contextProvider,
                 registerForActivityResult = registerForActivityResult,
                 rationaleMessage = "권한이 필요해요.",
-                shouldShowRequestPermissionRationale = { _ ->  true},
+                shouldShowRequestPermissionRationale = shouldShowRequestPermissionRationale,
                 onNegativeButtonClick = {
                     callback.onActivityResult(false)
                 },
