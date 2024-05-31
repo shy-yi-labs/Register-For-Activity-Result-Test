@@ -101,7 +101,6 @@ class PermissionPermanentlyDeniedActivityLauncherCallback<O>(
                 }
                 .setNegativeButton(android.R.string.cancel) { _, _ -> }
                 .show()
-            return
         }
 
         callback.onActivityResult(result)
