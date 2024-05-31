@@ -232,10 +232,10 @@ class PredefinedActivityResultLauncher<I, O>(
     private val input: I,
     activityResultLauncherProvider: (ActivityResultCallback<O>) -> ActivityResultLauncher<I>,
 ) {
-    private var mCallback: ((O) -> Unit)? = null
+    private var mCallback: ((I, O) -> Unit)? = null
 
     private val launcher = activityResultLauncherProvider {
-        mCallback?.invoke(it)
+        mCallback?.invoke(input, it)
         mCallback = null
     }
 
@@ -247,7 +247,7 @@ class PredefinedActivityResultLauncher<I, O>(
     }
 
     @Synchronized
-    fun launch(options: ActivityOptionsCompat? = null, callback: (O) -> Unit) {
+    fun launch(options: ActivityOptionsCompat? = null, callback: (I, O) -> Unit) {
         if (mCallback == null) {
             mCallback = callback
         } else {
