@@ -25,11 +25,12 @@ import androidx.fragment.app.Fragment
 
 /*
 요구사항
-- 다이얼로그 띄우기
+- 권한 요구 설명 다이얼로그 띄우기
 - 요청 조건 체크
 - 결과 Pass/Fail 판정
 - 사전 Permission 목록 정의
 - launch 시점 result callback 적용
+- 설정 이동 다이얼로그 띄우기
 */
 
 class HomeFragment : Fragment() {
