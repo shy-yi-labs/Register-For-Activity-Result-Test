@@ -54,8 +54,8 @@ class MainActivity : AppCompatActivity() {
         val button = findViewById<Button>(R.id.btClickMe)
 
         button.setOnClickListener {
-            launcher.launch { _, isGranted ->
-                if (isGranted) {
+            launcher.launch { _, permissionResultMap ->
+                if (permissionResultMap.isGranted) {
                     Toast.makeText(this, "권한 허용", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(this, "권한 거부", Toast.LENGTH_SHORT).show()

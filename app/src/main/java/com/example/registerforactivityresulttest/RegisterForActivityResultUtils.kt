@@ -17,7 +17,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 
 
-fun ComponentActivity.registerReadExternalMediaPermissionRequest(): PredefinedActivityResultLauncher<Array<String>, Boolean> {
+fun ComponentActivity.registerReadExternalMediaPermissionRequest(): PredefinedActivityResultLauncher<Array<String>, PermissionResultMap> {
     return registerReadExternalMediaPermissionRequest(
         contextProvider = { this },
         registerForActivityResult = this::registerForActivityResult,
@@ -25,7 +25,7 @@ fun ComponentActivity.registerReadExternalMediaPermissionRequest(): PredefinedAc
     )
 }
 
-fun Fragment.registerReadExternalMediaPermissionRequest(): PredefinedActivityResultLauncher<Array<String>, Boolean> {
+fun Fragment.registerReadExternalMediaPermissionRequest(): PredefinedActivityResultLauncher<Array<String>, PermissionResultMap> {
     return registerReadExternalMediaPermissionRequest(
         contextProvider = ::getActivity,
         registerForActivityResult = this::registerForActivityResult,
@@ -35,9 +35,9 @@ fun Fragment.registerReadExternalMediaPermissionRequest(): PredefinedActivityRes
 
 fun registerReadExternalMediaPermissionRequest(
     contextProvider: () -> Context?,
-    registerForActivityResult: (ActivityResultContract<Array<String>, Boolean>, ActivityResultCallback<Boolean>) -> ActivityResultLauncher<Array<String>>,
+    registerForActivityResult: (ActivityResultContract<Array<String>, PermissionResultMap>, ActivityResultCallback<PermissionResultMap>) -> ActivityResultLauncher<Array<String>>,
     shouldShowRequestPermissionRationale: (String) -> Boolean
-): PredefinedActivityResultLauncher<Array<String>, Boolean> {
+): PredefinedActivityResultLauncher<Array<String>, PermissionResultMap> {
     val permissions = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
 
     return PredefinedActivityResultLauncher(
@@ -48,7 +48,12 @@ fun registerReadExternalMediaPermissionRequest(
                 rationaleMessage = "권한이 필요해요.",
                 shouldShowRequestPermissionRationale = shouldShowRequestPermissionRationale,
                 onNegativeButtonClick = {
-                    callback.onActivityResult(false)
+                    callback.onActivityResult(
+                        PermissionResultMap(
+                            isGranted = false,
+                            permissionStateMap = permissions.associateWith { false },
+                        )
+                    )
                 },
                 contract = ConditionalMultiplePermissionRequestContract(
                     resultPredicate = { permissionStateMap -> permissionStateMap.values.all { it } },
@@ -58,9 +63,8 @@ fun registerReadExternalMediaPermissionRequest(
                 ),
                 callback = PermissionPermanentlyDeniedActivityLauncherCallback(
                     contextProvider = contextProvider,
-                    callback = callback,
-                    permissions = permissions,
-                    shouldShowRequestPermissionRationale = shouldShowRequestPermissionRationale
+                    shouldShowRequestPermissionRationale = shouldShowRequestPermissionRationale,
+                    callback = callback
                 )
             )
         },
@@ -68,19 +72,17 @@ fun registerReadExternalMediaPermissionRequest(
     )
 }
 
-class PermissionPermanentlyDeniedActivityLauncherCallback<O>(
+class PermissionPermanentlyDeniedActivityLauncherCallback<O: Map<String, Boolean>>(
     val contextProvider: () -> Context?,
-    val callback: ActivityResultCallback<O>,
-    val permissions: Array<String>,
-    val shouldShowRequestPermissionRationale: (String) -> Boolean
+    val shouldShowRequestPermissionRationale: (String) -> Boolean,
+    val callback: ActivityResultCallback<O>
 ): ActivityResultCallback<O> {
     override fun onActivityResult(result: O) {
         val context = contextProvider() ?: return
 
-        val permanentlyDeniedPermissions = permissions.filter {
-            context.checkSelfPermission(it) == PackageManager.PERMISSION_DENIED &&
-                    shouldShowRequestPermissionRationale(it).not()
-        }
+        val deniedPermissions = result.filter { it.value.not() }
+        val permanentlyDeniedPermissions =
+            deniedPermissions.keys.filter { shouldShowRequestPermissionRationale(it).not() }
 
         if (permanentlyDeniedPermissions.isNotEmpty()) {
             val message = StringBuilder().apply {
@@ -196,10 +198,15 @@ class RationaleActivityResultLauncher(
     }
 }
 
+class PermissionResultMap(
+    val isGranted: Boolean,
+    private val permissionStateMap: Map<String, Boolean>,
+): Map<String, Boolean> by permissionStateMap
+
 class ConditionalMultiplePermissionRequestContract(
     private val resultPredicate: (Map<String, Boolean>) -> Boolean,
     private val requestPredicate: (Map<String, Boolean>) -> Boolean = resultPredicate
-) : ActivityResultContract<Array<String>, Boolean>() {
+) : ActivityResultContract<Array<String>, PermissionResultMap>() {
 
     private val multiplePermissionRequestContract =
         ActivityResultContracts.RequestMultiplePermissions()
@@ -208,14 +215,19 @@ class ConditionalMultiplePermissionRequestContract(
         return multiplePermissionRequestContract.createIntent(context, input)
     }
 
-    override fun parseResult(resultCode: Int, intent: Intent?): Boolean {
-        return resultPredicate(multiplePermissionRequestContract.parseResult(resultCode, intent))
+    override fun parseResult(resultCode: Int, intent: Intent?): PermissionResultMap {
+        val permissionStateMap = multiplePermissionRequestContract.parseResult(resultCode, intent)
+
+        return PermissionResultMap(
+            isGranted = resultPredicate(permissionStateMap),
+            permissionStateMap = multiplePermissionRequestContract.parseResult(resultCode, intent),
+        )
     }
 
     override fun getSynchronousResult(
         context: Context,
         input: Array<String>
-    ): SynchronousResult<Boolean>? {
+    ): SynchronousResult<PermissionResultMap>? {
         val permissionStateMap = input.associateWith {
             ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
         }
@@ -223,7 +235,9 @@ class ConditionalMultiplePermissionRequestContract(
         return if (requestPredicate(permissionStateMap)) {
             null
         } else {
-            SynchronousResult(true)
+            SynchronousResult(
+                PermissionResultMap(resultPredicate(permissionStateMap), permissionStateMap)
+            )
         }
     }
 }
