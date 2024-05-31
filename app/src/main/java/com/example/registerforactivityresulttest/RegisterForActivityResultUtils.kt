@@ -79,17 +79,17 @@ class PermissionPermanentlyDeniedActivityLauncherCallback<O>(
 
         val permanentlyDeniedPermissions = permissions.filter {
             context.checkSelfPermission(it) == PackageManager.PERMISSION_DENIED &&
-                    shouldShowRequestPermissionRationale(it)
-        }
-
-        val message = StringBuilder().apply {
-            append("해당 기능을 사용할 수 없습니다.\n권한을 허용하시려면 설정을 눌러주세요.\n\n필요 권한:")
-            permanentlyDeniedPermissions.forEach {
-                append("\n- $it")
-            }
+                    shouldShowRequestPermissionRationale(it).not()
         }
 
         if (permanentlyDeniedPermissions.isNotEmpty()) {
+            val message = StringBuilder().apply {
+                append("해당 기능을 사용할 수 없습니다.\n권한을 허용하시려면 설정을 눌러주세요.\n\n필요 권한:")
+                permanentlyDeniedPermissions.forEach {
+                    append("\n- ${it.split(".").last()}")
+                }
+            }
+
             AlertDialog.Builder(context)
                 .setMessage(message)
                 .setPositiveButton(android.R.string.ok) { _, _ ->
