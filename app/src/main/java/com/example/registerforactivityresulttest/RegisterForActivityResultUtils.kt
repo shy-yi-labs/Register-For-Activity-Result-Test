@@ -19,7 +19,7 @@ import androidx.fragment.app.Fragment
 
 fun ComponentActivity.registerReadExternalMediaPermissionRequest(): PredefinedActivityResultLauncher<Array<String>, Boolean> {
     return registerReadExternalMediaPermissionRequest(
-        context = this,
+        contextProvider = { this },
         registerForActivityResult = this::registerForActivityResult,
         shouldShowRequestPermissionRationale = this::shouldShowRequestPermissionRationale
     )
@@ -27,14 +27,14 @@ fun ComponentActivity.registerReadExternalMediaPermissionRequest(): PredefinedAc
 
 fun Fragment.registerReadExternalMediaPermissionRequest(): PredefinedActivityResultLauncher<Array<String>, Boolean> {
     return registerReadExternalMediaPermissionRequest(
-        context = requireContext(),
+        contextProvider = ::getActivity,
         registerForActivityResult = this::registerForActivityResult,
         shouldShowRequestPermissionRationale = this::shouldShowRequestPermissionRationale
     )
 }
 
 fun registerReadExternalMediaPermissionRequest(
-    context: Context,
+    contextProvider: () -> Context?,
     registerForActivityResult: (ActivityResultContract<Array<String>, Boolean>, ActivityResultCallback<Boolean>) -> ActivityResultLauncher<Array<String>>,
     shouldShowRequestPermissionRationale: (String) -> Boolean
 ): PredefinedActivityResultLauncher<Array<String>, Boolean> {
@@ -43,7 +43,7 @@ fun registerReadExternalMediaPermissionRequest(
     return PredefinedActivityResultLauncher(
         activityResultLauncherProvider = { callback ->
             registerForActivityResultWithRationale(
-                context = context,
+                contextProvider = contextProvider,
                 registerForActivityResult = registerForActivityResult,
                 rationaleMessage = "권한이 필요해요.",
                 shouldShowRequestPermissionRationale = { _ ->  true},
@@ -57,7 +57,7 @@ fun registerReadExternalMediaPermissionRequest(
                     }
                 ),
                 callback = PermissionPermanentlyDeniedActivityLauncherCallback(
-                    context = context,
+                    contextProvider = contextProvider,
                     callback = callback,
                     permissions = permissions,
                     shouldShowRequestPermissionRationale = shouldShowRequestPermissionRationale
@@ -69,12 +69,14 @@ fun registerReadExternalMediaPermissionRequest(
 }
 
 class PermissionPermanentlyDeniedActivityLauncherCallback<O>(
-    val context: Context,
+    val contextProvider: () -> Context?,
     val callback: ActivityResultCallback<O>,
     val permissions: Array<String>,
     val shouldShowRequestPermissionRationale: (String) -> Boolean
 ): ActivityResultCallback<O> {
     override fun onActivityResult(result: O) {
+        val context = contextProvider() ?: return
+
         val permanentlyDeniedPermissions = permissions.filter {
             context.checkSelfPermission(it) == PackageManager.PERMISSION_DENIED &&
                     shouldShowRequestPermissionRationale(it)
@@ -115,7 +117,7 @@ fun <O> ComponentActivity.registerForActivityResultWithRationale(
     callback: ActivityResultCallback<O>
 ): ActivityResultLauncher<Array<String>> {
     return registerForActivityResultWithRationale(
-        context = this,
+        contextProvider = { this },
         registerForActivityResult = this::registerForActivityResult,
         shouldShowRequestPermissionRationale = shouldShowRequestPermissionRationale,
         rationaleMessage = rationaleMessage,
@@ -133,7 +135,7 @@ fun <O> Fragment.registerForActivityResultWithRationale(
     callback: ActivityResultCallback<O>
 ): ActivityResultLauncher<Array<String>> {
     return registerForActivityResultWithRationale(
-        context = requireContext(),
+        contextProvider = ::getActivity,
         registerForActivityResult = this::registerForActivityResult,
         shouldShowRequestPermissionRationale = shouldShowRequestPermissionRationale,
         rationaleMessage = rationaleMessage,
@@ -144,7 +146,7 @@ fun <O> Fragment.registerForActivityResultWithRationale(
 }
 
 fun <O> registerForActivityResultWithRationale(
-    context: Context,
+    contextProvider: () -> Context?,
     registerForActivityResult: (ActivityResultContract<Array<String>, O>, ActivityResultCallback<O>) -> ActivityResultLauncher<Array<String>>,
     shouldShowRequestPermissionRationale: (String) -> Boolean,
     rationaleMessage: String,
@@ -153,7 +155,7 @@ fun <O> registerForActivityResultWithRationale(
     callback: ActivityResultCallback<O>
 ): ActivityResultLauncher<Array<String>> {
     return RationaleActivityResultLauncher(
-        context = context,
+        contextProvider = contextProvider,
         shouldShowRequestPermissionRationale = shouldShowRequestPermissionRationale,
         rationaleMessage = rationaleMessage,
         onNegativeButtonClick = onNegativeButtonClick,
@@ -162,7 +164,7 @@ fun <O> registerForActivityResultWithRationale(
 }
 
 class RationaleActivityResultLauncher(
-    private val context: Context,
+    private val contextProvider: () -> Context?,
     private val launcher: ActivityResultLauncher<Array<String>>,
     private val rationaleMessage: String,
     private val shouldShowRequestPermissionRationale: (String) -> Boolean,
@@ -176,6 +178,7 @@ class RationaleActivityResultLauncher(
     }
 
     override fun launch(input: Array<String>, options: ActivityOptionsCompat?) {
+        val context = contextProvider() ?: return
         val permissionsToShowRationale = input.filter { shouldShowRequestPermissionRationale(it) }
 
         if (permissionsToShowRationale.isNotEmpty()) {
