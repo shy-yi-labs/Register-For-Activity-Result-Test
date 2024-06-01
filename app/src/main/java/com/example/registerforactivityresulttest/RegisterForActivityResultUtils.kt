@@ -203,7 +203,7 @@ class PermissionResultMap(
 
 class ConditionalMultiplePermissionRequestContract(
     private val resultPredicate: (Map<String, Boolean>) -> Boolean,
-    private val requestPredicate: (Map<String, Boolean>) -> Boolean = resultPredicate
+    private val requestPredicate: (Map<String, Boolean>) -> Boolean = { resultPredicate(it).not() }
 ) : ActivityResultContract<Array<String>, PermissionResultMap>() {
 
     private val multiplePermissionRequestContract =
